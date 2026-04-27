@@ -37,6 +37,7 @@ struct Settings {
     char wifi_password[64];
     char ktox_host[64];
     uint16_t ktox_port;
+    char auth_token[256];
 } settings;
 
 struct {
@@ -268,8 +269,9 @@ void load_settings() {
 
             strcpy(settings.wifi_ssid, doc["wifi_ssid"] | "");
             strcpy(settings.wifi_password, doc["wifi_password"] | "");
-            strcpy(settings.ktox_host, doc["ktox_host"] | "192.168.1.100");
+            strcpy(settings.ktox_host, doc["ktox_host"] | "192.168.0.50");
             settings.ktox_port = doc["ktox_port"] | 8765;
+            strcpy(settings.auth_token, doc["auth_token"] | "");
 
             file.close();
 
@@ -292,11 +294,12 @@ void load_settings() {
 }
 
 void save_settings() {
-    DynamicJsonDocument doc(512);
+    DynamicJsonDocument doc(1024);
     doc["wifi_ssid"] = settings.wifi_ssid;
     doc["wifi_password"] = settings.wifi_password;
     doc["ktox_host"] = settings.ktox_host;
     doc["ktox_port"] = settings.ktox_port;
+    doc["auth_token"] = settings.auth_token;
 
     File file = SPIFFS.open("/settings.json", "w");
     if (file) {
@@ -622,10 +625,15 @@ void show_setup_wizard() {
         }
 
     } else if (setup_step == 3) {
-        String ip = get_text_input("KTOx IP (192.168.1.100):", 15);
+        String ip = get_text_input("KTOx IP (192.168.0.50):", 15);
         if (ip.length() > 0) {
             strcpy(settings.ktox_host, ip.c_str());
         }
+        setup_step = 4;
+
+    } else if (setup_step == 4) {
+        String token = get_text_input("Auth Token (optional):", 255);
+        strcpy(settings.auth_token, token.c_str());
         save_settings();
 
         M5Cardputer.Display.fillScreen(TFT_BLACK);
@@ -635,8 +643,11 @@ void show_setup_wizard() {
         M5Cardputer.Display.println("Settings Saved!");
         M5Cardputer.Display.println("");
         M5Cardputer.Display.setTextColor(KTOX_WHITE);
-        M5Cardputer.Display.println("SSID: " + String(settings.wifi_ssid));
-        M5Cardputer.Display.println("IP: " + String(settings.ktox_host));
+        M5Cardputer.Display.println("WiFi: " + String(settings.wifi_ssid));
+        M5Cardputer.Display.println("Host: " + String(settings.ktox_host));
+        if (strlen(settings.auth_token) > 0) {
+            M5Cardputer.Display.println("Token: Set");
+        }
         M5Cardputer.Display.println("");
         M5Cardputer.Display.setTextColor(KTOX_ORANGE);
         M5Cardputer.Display.println("Connecting to WiFi...");
@@ -792,8 +803,21 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             break;
 
         case WStype_CONNECTED:
-            Serial.println("[WSc] Connected!");
+            Serial.println("[WSc] ✓ CONNECTED!");
             ws_connected = true;
+
+            // Send auth token if configured
+            if (strlen(settings.auth_token) > 0) {
+                Serial.printf("[WSc] Sending auth token...\n");
+                DynamicJsonDocument auth_doc(512);
+                auth_doc["type"] = "auth";
+                auth_doc["token"] = settings.auth_token;
+                String auth_json;
+                serializeJson(auth_doc, auth_json);
+                webSocket.sendTXT(auth_json);
+            }
+
+            Serial.println("[WSc] Waiting for frames...");
             M5Cardputer.Display.fillScreen(TFT_BLACK);
             M5Cardputer.Display.setTextColor(KTOX_GREEN);
             M5Cardputer.Display.setTextSize(2);
@@ -803,32 +827,55 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             M5Cardputer.Display.setTextSize(1);
             M5Cardputer.Display.setCursor(0, 90);
             M5Cardputer.Display.println("Connected!");
+            if (strlen(settings.auth_token) > 0) {
+                M5Cardputer.Display.println("Authenticating...");
+            }
+            M5Cardputer.Display.println("Receiving stream...");
             delay(1000);
             break;
 
         case WStype_TEXT: {
+            Serial.printf("[WSc] Message received: %d bytes\n", length);
+
             DynamicJsonDocument doc(50000);
             DeserializationError error = deserializeJson(doc, payload);
 
             if (error) {
-                Serial.print("JSON error: ");
-                Serial.println(error.c_str());
+                Serial.printf("[WSc] JSON ERROR: %s\n", error.c_str());
                 frame_stats.errors++;
                 return;
             }
 
             const char* msg_type = doc["type"];
-            if (msg_type == nullptr) return;
+            Serial.printf("[WSc] Message type: %s\n", msg_type ? msg_type : "null");
+
+            if (msg_type == nullptr) {
+                Serial.println("[WSc] No type field!");
+                return;
+            }
 
             if (strcmp(msg_type, "frame") == 0) {
                 const char* data = doc["data"];
                 if (data) {
+                    int data_len = strlen(data);
+                    Serial.printf("[WSc] FRAME: %d bytes\n", data_len);
                     handle_frame_data(data);
                     frame_stats.received++;
+                    Serial.printf("[WSc] Frame decoded! (total: %d)\n", frame_stats.decoded);
+                } else {
+                    Serial.println("[WSc] Frame message but NO DATA!");
                 }
             } else if (strcmp(msg_type, "result") == 0) {
                 last_result = doc["data"] | "Operation executed";
+                Serial.printf("[WSc] Result: %s\n", last_result.c_str());
                 current_state = STATE_EXECUTION;
+            } else if (strcmp(msg_type, "auth_ok") == 0) {
+                Serial.println("[WSc] ✓ Authentication successful!");
+            } else if (strcmp(msg_type, "auth_error") == 0) {
+                Serial.println("[WSc] ✗ Authentication failed!");
+                ws_connected = false;
+            } else {
+                Serial.printf("[WSc] UNKNOWN type: %s\n", msg_type);
             }
             break;
         }
@@ -851,27 +898,36 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 // ==================== FRAME HANDLING ====================
 void handle_frame_data(const char* base64_data) {
+    Serial.printf("[Frame] Base64 input size: %d bytes\n", strlen(base64_data));
+
     uint32_t jpeg_size = base64_decode_expected_len(strlen(base64_data));
+    Serial.printf("[Frame] Expected JPEG size: %d bytes\n", jpeg_size);
+
     uint8_t jpeg_buffer[jpeg_size];
 
     int decoded_size = base64_decode((unsigned char*)base64_data,
                                       strlen(base64_data),
                                       jpeg_buffer);
 
+    Serial.printf("[Frame] Decoded size: %d bytes\n", decoded_size);
+
     if (decoded_size <= 0) {
-        Serial.println("Base64 decode failed!");
+        Serial.println("[Frame] Base64 decode failed!");
         frame_stats.errors++;
         return;
     }
 
+    Serial.println("[Frame] Calling TJpgDec.drawJpg()...");
     TJpgDec.drawJpg(0, 0, jpeg_buffer, decoded_size);
+    Serial.println("[Frame] TJpgDec.drawJpg() complete");
+
     frame_stats.decoded++;
     frame_count++;
 
     static unsigned long last_stats = 0;
     if (millis() - last_stats > 5000) {
         last_stats = millis();
-        Serial.printf("Frames: recv=%d, decoded=%d, errors=%d\n",
+        Serial.printf("[Stats] Frames: recv=%d, decoded=%d, errors=%d\n",
                       frame_stats.received, frame_stats.decoded, frame_stats.errors);
     }
 }
