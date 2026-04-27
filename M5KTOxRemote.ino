@@ -12,7 +12,7 @@
  * Framework: Arduino
  */
 
-#include <M5CardComputer.h>
+#include <M5Cardputer.h>
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
@@ -71,7 +71,7 @@ void draw_status_bar();
 // ==================== SETUP ====================
 void setup() {
     auto cfg = M5.config();
-    M5.begin(cfg);
+    M5Cardputer.begin(cfg);
 
     Serial.begin(115200);
     delay(2000);
@@ -82,18 +82,18 @@ void setup() {
     Serial.println("================================");
 
     // Initialize display
-    M5.Lcd.fillScreen(TFT_BLACK);
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.setTextColor(TFT_GREEN, TFT_BLACK);
-    M5.Lcd.println("KTOx Remote v2");
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setTextColor(TFT_CYAN);
-    M5.Lcd.println("Initializing...");
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
+    M5Cardputer.Display.setTextSize(2);
+    M5Cardputer.Display.setTextColor(TFT_GREEN, TFT_BLACK);
+    M5Cardputer.Display.println("KTOx Remote v2");
+    M5Cardputer.Display.setTextSize(1);
+    M5Cardputer.Display.setTextColor(TFT_CYAN);
+    M5Cardputer.Display.println("Initializing...");
 
     // Initialize SPIFFS for settings storage
     if (!SPIFFS.begin(true)) {
-        M5.Lcd.setTextColor(TFT_RED);
-        M5.Lcd.println("SPIFFS init failed!");
+        M5Cardputer.Display.setTextColor(TFT_RED);
+        M5Cardputer.Display.println("SPIFFS init failed!");
         while(1) delay(100);
     }
 
@@ -109,7 +109,7 @@ void setup() {
 
 // ==================== MAIN LOOP ====================
 void loop() {
-    M5.update();
+    M5Cardputer.update();
 
     switch(current_state) {
         case STATE_SETUP:
@@ -136,10 +136,10 @@ void loop() {
             if (millis() - last_ws_check > 5000) {
                 last_ws_check = millis();
                 if (!ws_connected) {
-                    M5.Lcd.setTextColor(TFT_RED);
-                    M5.Lcd.fillRect(0, 120, 240, 15, TFT_BLACK);
-                    M5.Lcd.setCursor(0, 120);
-                    M5.Lcd.print("WS: Reconnecting...");
+                    M5Cardputer.Display.setTextColor(TFT_RED);
+                    M5Cardputer.Display.fillRect(0, 120, 240, 15, TFT_BLACK);
+                    M5Cardputer.Display.setCursor(0, 120);
+                    M5Cardputer.Display.print("WS: Reconnecting...");
                     setup_websocket();
                 }
             }
@@ -208,21 +208,21 @@ void save_settings() {
 // ==================== INPUT HELPERS ====================
 String get_text_input(const char* prompt, int max_len, bool is_password = false) {
     String input = "";
-    M5.Lcd.fillScreen(TFT_BLACK);
-    M5.Lcd.setTextColor(TFT_CYAN);
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setCursor(0, 0);
-    M5.Lcd.println(prompt);
-    M5.Lcd.setTextColor(TFT_YELLOW);
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
+    M5Cardputer.Display.setTextColor(TFT_CYAN);
+    M5Cardputer.Display.setTextSize(1);
+    M5Cardputer.Display.setCursor(0, 0);
+    M5Cardputer.Display.println(prompt);
+    M5Cardputer.Display.setTextColor(TFT_YELLOW);
 
     unsigned long timeout = millis() + 60000; // 60 second timeout
 
     while (millis() < timeout) {
-        M5.update();
-        M5.Keyboard.update();
+        M5Cardputer.update();
+        M5Cardputer.Keyboard.update();
 
-        if (M5.Keyboard.isPressed()) {
-            char c = M5.Keyboard.getKey();
+        if (M5Cardputer.Keyboard.isPressed()) {
+            char c = M5Cardputer.Keyboard.getKey();
 
             if (c == '\r') {  // Enter key
                 return input;
@@ -235,20 +235,20 @@ String get_text_input(const char* prompt, int max_len, bool is_password = false)
             }
 
             // Display
-            M5.Lcd.fillRect(0, 30, 240, 80, TFT_BLACK);
-            M5.Lcd.setCursor(0, 30);
+            M5Cardputer.Display.fillRect(0, 30, 240, 80, TFT_BLACK);
+            M5Cardputer.Display.setCursor(0, 30);
             if (is_password) {
                 for (int i = 0; i < input.length(); i++) {
-                    M5.Lcd.print("*");
+                    M5Cardputer.Display.print("*");
                 }
             } else {
-                M5.Lcd.print(input);
+                M5Cardputer.Display.print(input);
             }
 
-            M5.Lcd.setTextColor(TFT_GRAY);
-            M5.Lcd.setCursor(0, 110);
-            M5.Lcd.println("ENTER to confirm");
-            M5.Lcd.println("Timeout: 60s");
+            M5Cardputer.Display.setTextColor(TFT_GRAY);
+            M5Cardputer.Display.setCursor(0, 110);
+            M5Cardputer.Display.println("ENTER to confirm");
+            M5Cardputer.Display.println("Timeout: 60s");
         }
 
         delay(10);
@@ -263,24 +263,24 @@ void show_setup_wizard() {
 
     if (setup_step == 0) {
         // Welcome
-        M5.Lcd.fillScreen(TFT_BLACK);
-        M5.Lcd.setTextColor(TFT_GREEN);
-        M5.Lcd.setTextSize(2);
-        M5.Lcd.setCursor(0, 10);
-        M5.Lcd.println("KTOx Remote");
-        M5.Lcd.setTextSize(1);
-        M5.Lcd.setTextColor(TFT_CYAN);
-        M5.Lcd.setCursor(0, 50);
-        M5.Lcd.println("First Time Setup");
-        M5.Lcd.println("");
-        M5.Lcd.println("Press ANY KEY to start");
-        M5.Lcd.println("Setup:");
-        M5.Lcd.println("1. WiFi SSID");
-        M5.Lcd.println("2. WiFi Password");
-        M5.Lcd.println("3. KTOx IP Address");
+        M5Cardputer.Display.fillScreen(TFT_BLACK);
+        M5Cardputer.Display.setTextColor(TFT_GREEN);
+        M5Cardputer.Display.setTextSize(2);
+        M5Cardputer.Display.setCursor(0, 10);
+        M5Cardputer.Display.println("KTOx Remote");
+        M5Cardputer.Display.setTextSize(1);
+        M5Cardputer.Display.setTextColor(TFT_CYAN);
+        M5Cardputer.Display.setCursor(0, 50);
+        M5Cardputer.Display.println("First Time Setup");
+        M5Cardputer.Display.println("");
+        M5Cardputer.Display.println("Press ANY KEY to start");
+        M5Cardputer.Display.println("Setup:");
+        M5Cardputer.Display.println("1. WiFi SSID");
+        M5Cardputer.Display.println("2. WiFi Password");
+        M5Cardputer.Display.println("3. KTOx IP Address");
 
-        M5.update();
-        if (M5.Keyboard.isPressed()) {
+        M5Cardputer.update();
+        if (M5Cardputer.Keyboard.isPressed()) {
             setup_step = 1;
             delay(500);
         }
@@ -310,17 +310,17 @@ void show_setup_wizard() {
         save_settings();
 
         // Confirm
-        M5.Lcd.fillScreen(TFT_BLACK);
-        M5.Lcd.setTextColor(TFT_GREEN);
-        M5.Lcd.setTextSize(1);
-        M5.Lcd.setCursor(0, 10);
-        M5.Lcd.println("Settings Saved!");
-        M5.Lcd.println("");
-        M5.Lcd.println("SSID: " + String(settings.wifi_ssid));
-        M5.Lcd.println("IP: " + String(settings.ktox_host));
-        M5.Lcd.println("Port: " + String(settings.ktox_port));
-        M5.Lcd.println("");
-        M5.Lcd.println("Connecting to WiFi...");
+        M5Cardputer.Display.fillScreen(TFT_BLACK);
+        M5Cardputer.Display.setTextColor(TFT_GREEN);
+        M5Cardputer.Display.setTextSize(1);
+        M5Cardputer.Display.setCursor(0, 10);
+        M5Cardputer.Display.println("Settings Saved!");
+        M5Cardputer.Display.println("");
+        M5Cardputer.Display.println("SSID: " + String(settings.wifi_ssid));
+        M5Cardputer.Display.println("IP: " + String(settings.ktox_host));
+        M5Cardputer.Display.println("Port: " + String(settings.ktox_port));
+        M5Cardputer.Display.println("");
+        M5Cardputer.Display.println("Connecting to WiFi...");
 
         delay(2000);
         current_state = STATE_WIFI_CONNECTING;
@@ -337,28 +337,28 @@ void show_config_menu() {
     };
     const int menu_size = 4;
 
-    M5.Lcd.fillScreen(TFT_BLACK);
-    M5.Lcd.setTextColor(TFT_CYAN);
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.setCursor(0, 0);
-    M5.Lcd.println("CONFIG");
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
+    M5Cardputer.Display.setTextColor(TFT_CYAN);
+    M5Cardputer.Display.setTextSize(2);
+    M5Cardputer.Display.setCursor(0, 0);
+    M5Cardputer.Display.println("CONFIG");
 
-    M5.Lcd.setTextSize(1);
+    M5Cardputer.Display.setTextSize(1);
     for (int i = 0; i < menu_size; i++) {
         if (i == menu_index) {
-            M5.Lcd.setTextColor(TFT_BLACK, TFT_GREEN);
-            M5.Lcd.printf("> %s\n", menu_items[i]);
-            M5.Lcd.setTextColor(TFT_WHITE);
+            M5Cardputer.Display.setTextColor(TFT_BLACK, TFT_GREEN);
+            M5Cardputer.Display.printf("> %s\n", menu_items[i]);
+            M5Cardputer.Display.setTextColor(TFT_WHITE);
         } else {
-            M5.Lcd.printf("  %s\n", menu_items[i]);
+            M5Cardputer.Display.printf("  %s\n", menu_items[i]);
         }
     }
 
-    M5.update();
-    M5.Keyboard.update();
+    M5Cardputer.update();
+    M5Cardputer.Keyboard.update();
 
-    if (M5.Keyboard.isPressed()) {
-        char c = M5.Keyboard.getKey();
+    if (M5Cardputer.Keyboard.isPressed()) {
+        char c = M5Cardputer.Keyboard.getKey();
 
         if (c == 'w' || c == 'i') {  // UP
             menu_index = (menu_index - 1 + menu_size) % menu_size;
@@ -400,14 +400,14 @@ void setup_wifi() {
     static bool shown_screen = false;
 
     if (!shown_screen) {
-        M5.Lcd.fillScreen(TFT_BLACK);
-        M5.Lcd.setTextColor(TFT_YELLOW);
-        M5.Lcd.setTextSize(1);
-        M5.Lcd.setCursor(0, 0);
-        M5.Lcd.println("WiFi Setup");
-        M5.Lcd.setTextColor(TFT_CYAN);
-        M5.Lcd.printf("SSID: %s\n", settings.wifi_ssid);
-        M5.Lcd.println("Connecting...");
+        M5Cardputer.Display.fillScreen(TFT_BLACK);
+        M5Cardputer.Display.setTextColor(TFT_YELLOW);
+        M5Cardputer.Display.setTextSize(1);
+        M5Cardputer.Display.setCursor(0, 0);
+        M5Cardputer.Display.println("WiFi Setup");
+        M5Cardputer.Display.setTextColor(TFT_CYAN);
+        M5Cardputer.Display.printf("SSID: %s\n", settings.wifi_ssid);
+        M5Cardputer.Display.println("Connecting...");
 
         WiFi.mode(WIFI_STA);
         WiFi.begin(settings.wifi_ssid, settings.wifi_password);
@@ -416,9 +416,9 @@ void setup_wifi() {
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-        M5.Lcd.setTextColor(TFT_GREEN);
-        M5.Lcd.println("Connected!");
-        M5.Lcd.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+        M5Cardputer.Display.setTextColor(TFT_GREEN);
+        M5Cardputer.Display.println("Connected!");
+        M5Cardputer.Display.printf("IP: %s\n", WiFi.localIP().toString().c_str());
 
         Serial.println("WiFi connected!");
         Serial.print("IP: ");
@@ -428,28 +428,28 @@ void setup_wifi() {
         current_state = STATE_WS_CONNECTING;
         shown_screen = false;
     } else if (WiFi.status() == WL_CONNECT_FAILED) {
-        M5.Lcd.setTextColor(TFT_RED);
-        M5.Lcd.println("Failed!");
-        M5.Lcd.println("Press KEY2 to retry");
+        M5Cardputer.Display.setTextColor(TFT_RED);
+        M5Cardputer.Display.println("Failed!");
+        M5Cardputer.Display.println("Press KEY2 to retry");
 
         delay(5000);
         current_state = STATE_SETUP;
         shown_screen = false;
     } else {
-        M5.Lcd.print(".");
+        M5Cardputer.Display.print(".");
     }
 }
 
 // ==================== WebSocket SETUP ====================
 void setup_websocket() {
-    M5.Lcd.fillScreen(TFT_BLACK);
-    M5.Lcd.setTextColor(TFT_YELLOW);
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setCursor(0, 0);
-    M5.Lcd.println("WebSocket Setup");
-    M5.Lcd.setTextColor(TFT_CYAN);
-    M5.Lcd.printf("Host: %s:%d\n", settings.ktox_host, settings.ktox_port);
-    M5.Lcd.println("Connecting...");
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
+    M5Cardputer.Display.setTextColor(TFT_YELLOW);
+    M5Cardputer.Display.setTextSize(1);
+    M5Cardputer.Display.setCursor(0, 0);
+    M5Cardputer.Display.println("WebSocket Setup");
+    M5Cardputer.Display.setTextColor(TFT_CYAN);
+    M5Cardputer.Display.printf("Host: %s:%d\n", settings.ktox_host, settings.ktox_port);
+    M5Cardputer.Display.println("Connecting...");
 
     Serial.printf("Connecting to WebSocket: %s:%d\n", settings.ktox_host, settings.ktox_port);
 
@@ -472,9 +472,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         case WStype_CONNECTED:
             Serial.println("[WSc] Connected!");
             ws_connected = true;
-            M5.Lcd.fillScreen(TFT_BLACK);
-            M5.Lcd.setTextColor(TFT_GREEN);
-            M5.Lcd.println("KTOx Connected!");
+            M5Cardputer.Display.fillScreen(TFT_BLACK);
+            M5Cardputer.Display.setTextColor(TFT_GREEN);
+            M5Cardputer.Display.println("KTOx Connected!");
             delay(1000);
             break;
 
@@ -537,16 +537,16 @@ void handle_frame_data(const char* base64_data) {
 
 // ==================== JPEG CALLBACK ====================
 bool jpeg_decode_callback(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
-    M5.Lcd.pushImage(x, y, w, h, bitmap);
+    M5Cardputer.Display.pushImage(x, y, w, h, bitmap);
     return true;
 }
 
 // ==================== KEYBOARD INPUT ====================
 void read_keyboard_input() {
-    M5.Keyboard.update();
+    M5Cardputer.Keyboard.update();
 
-    if (M5.Keyboard.isPressed()) {
-        char c = M5.Keyboard.getKey();
+    if (M5Cardputer.Keyboard.isPressed()) {
+        char c = M5Cardputer.Keyboard.getKey();
 
         // KEY2 opens config menu
         if (c == 'h' || (int)c == 2) {
@@ -593,11 +593,11 @@ void draw_status_bar() {
              frame_count,
              frame_count * 1000.0f / (millis() + 1));
 
-    M5.Lcd.setTextColor(ws_connected ? TFT_GREEN : TFT_RED, TFT_BLACK);
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.fillRect(0, 125, 240, 10, TFT_BLACK);
-    M5.Lcd.setCursor(0, 125);
-    M5.Lcd.print(status);
+    M5Cardputer.Display.setTextColor(ws_connected ? TFT_GREEN : TFT_RED, TFT_BLACK);
+    M5Cardputer.Display.setTextSize(1);
+    M5Cardputer.Display.fillRect(0, 125, 240, 10, TFT_BLACK);
+    M5Cardputer.Display.setCursor(0, 125);
+    M5Cardputer.Display.print(status);
 }
 
 // ==================== BASE64 DECODE ====================
