@@ -219,19 +219,20 @@ String get_text_input(const char* prompt, int max_len, bool is_password = false)
 
     while (millis() < timeout) {
         M5Cardputer.update();
-        M5Cardputer.Keyboard.update();
 
-        if (M5Cardputer.Keyboard.isPressed()) {
-            char c = M5Cardputer.Keyboard.getKey();
+        if (M5Cardputer.Keyboard.isChange()) {
+            auto status = M5Cardputer.Keyboard.keysState();
 
-            if (c == '\r') {  // Enter key
+            if (status.enter) {  // Enter key
                 return input;
-            } else if (c == '\b' || c == 8) {  // Backspace
+            }
+            if (status.del) {  // Backspace/Delete
                 if (input.length() > 0) {
                     input.remove(input.length() - 1);
                 }
-            } else if (c >= 32 && c < 127 && input.length() < max_len) {
-                input += c;
+            }
+            if (status.word && input.length() < max_len) {
+                input += status.word;
             }
 
             // Display
@@ -280,7 +281,7 @@ void show_setup_wizard() {
         M5Cardputer.Display.println("3. KTOx IP Address");
 
         M5Cardputer.update();
-        if (M5Cardputer.Keyboard.isPressed()) {
+        if (M5Cardputer.Keyboard.isChange()) {
             setup_step = 1;
             delay(500);
         }
@@ -355,18 +356,17 @@ void show_config_menu() {
     }
 
     M5Cardputer.update();
-    M5Cardputer.Keyboard.update();
 
-    if (M5Cardputer.Keyboard.isPressed()) {
-        char c = M5Cardputer.Keyboard.getKey();
+    if (M5Cardputer.Keyboard.isChange()) {
+        auto status = M5Cardputer.Keyboard.keysState();
 
-        if (c == 'w' || c == 'i') {  // UP
+        if (status.word == 'w' || status.word == 'i') {  // UP
             menu_index = (menu_index - 1 + menu_size) % menu_size;
             delay(200);
-        } else if (c == 's' || c == 'k') {  // DOWN
+        } else if (status.word == 's' || status.word == 'k') {  // DOWN
             menu_index = (menu_index + 1) % menu_size;
             delay(200);
-        } else if (c == ' ' || c == '\r') {  // SELECT
+        } else if (status.word == ' ' || status.enter) {  // SELECT
             if (menu_index == 0) {
                 String ssid = get_text_input("Enter WiFi SSID:", 63);
                 if (ssid.length() > 0) {
@@ -456,7 +456,6 @@ void setup_websocket() {
     webSocket.begin(settings.ktox_host, settings.ktox_port, "/");
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(5000);
-    webSocket.setUseSSL(false);
 
     delay(2000);
 }
@@ -543,26 +542,27 @@ bool jpeg_decode_callback(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t
 
 // ==================== KEYBOARD INPUT ====================
 void read_keyboard_input() {
-    M5Cardputer.Keyboard.update();
+    if (M5Cardputer.Keyboard.isChange()) {
+        auto status = M5Cardputer.Keyboard.keysState();
 
-    if (M5Cardputer.Keyboard.isPressed()) {
-        char c = M5Cardputer.Keyboard.getKey();
-
-        // KEY2 opens config menu
-        if (c == 'h' || (int)c == 2) {
+        // KEY2 opens config menu (check for specific keys)
+        if (status.word == 'h' || status.word == 2) {
             current_state = STATE_CONFIG_MENU;
             delay(300);
             return;
         }
 
-        switch(c) {
+        switch(status.word) {
             case 'w': case 'W': case 'i': send_button_press("UP"); break;
             case 's': case 'S': case 'k': send_button_press("DOWN"); break;
             case 'a': case 'A': case 'j': send_button_press("LEFT"); break;
             case 'd': case 'D': case 'l': send_button_press("RIGHT"); break;
-            case ' ': case '\r': send_button_press("OK"); break;
+            case ' ': send_button_press("OK"); break;
             case '\x1b': send_button_press("KEY1"); break;
             case 'q': case 'Q': send_button_press("KEY3"); break;
+        }
+        if (status.enter) {
+            send_button_press("OK");
         }
     }
 }
