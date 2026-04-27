@@ -160,6 +160,8 @@ void show_results();
 void display_header(const char* title);
 void show_help_screen();
 String get_text_input(const char* prompt, int max_len, bool is_password = false);
+uint32_t base64_decode_expected_len(uint32_t encoded_len);
+int base64_decode(unsigned char *in, unsigned int in_len, unsigned char *out);
 
 // ==================== SETUP ====================
 void setup() {
@@ -833,6 +835,16 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
         case WStype_ERROR:
             Serial.println("[WSc] WebSocket error!");
+            break;
+
+        case WStype_BIN:
+        case WStype_FRAGMENT_TEXT_START:
+        case WStype_FRAGMENT_BIN_START:
+        case WStype_FRAGMENT:
+        case WStype_FRAGMENT_FIN:
+        case WStype_PING:
+        case WStype_PONG:
+            // Not used in this application
             break;
     }
 }
