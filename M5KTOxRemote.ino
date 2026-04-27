@@ -231,8 +231,12 @@ String get_text_input(const char* prompt, int max_len, bool is_password = false)
                     input.remove(input.length() - 1);
                 }
             }
-            if (status.word && input.length() < max_len) {
-                input += status.word;
+            if (!status.word.empty() && input.length() < max_len) {
+                for (char c : status.word) {
+                    if (input.length() < max_len) {
+                        input += c;
+                    }
+                }
             }
 
             // Display
@@ -360,13 +364,44 @@ void show_config_menu() {
     if (M5Cardputer.Keyboard.isChange()) {
         auto status = M5Cardputer.Keyboard.keysState();
 
-        if (status.word == 'w' || status.word == 'i') {  // UP
-            menu_index = (menu_index - 1 + menu_size) % menu_size;
-            delay(200);
-        } else if (status.word == 's' || status.word == 'k') {  // DOWN
-            menu_index = (menu_index + 1) % menu_size;
-            delay(200);
-        } else if (status.word == ' ' || status.enter) {  // SELECT
+        if (!status.word.empty()) {
+            char key = status.word[0];
+
+            if (key == 'w' || key == 'i') {  // UP
+                menu_index = (menu_index - 1 + menu_size) % menu_size;
+                delay(200);
+            } else if (key == 's' || key == 'k') {  // DOWN
+                menu_index = (menu_index + 1) % menu_size;
+                delay(200);
+            } else if (key == ' ') {  // SELECT
+                if (menu_index == 0) {
+                    String ssid = get_text_input("Enter WiFi SSID:", 63);
+                    if (ssid.length() > 0) {
+                        strcpy(settings.wifi_ssid, ssid.c_str());
+                        save_settings();
+                    }
+                } else if (menu_index == 1) {
+                    String pwd = get_text_input("Enter WiFi Password:", 63, true);
+                    if (pwd.length() > 0) {
+                        strcpy(settings.wifi_password, pwd.c_str());
+                        save_settings();
+                    }
+                } else if (menu_index == 2) {
+                    String ip = get_text_input("Enter KTOx IP:", 15);
+                    if (ip.length() > 0) {
+                        strcpy(settings.ktox_host, ip.c_str());
+                        save_settings();
+                    }
+                } else if (menu_index == 3) {
+                    current_state = STATE_RUNNING;
+                    menu_index = 0;
+                    return;
+                }
+                delay(500);
+            }
+        }
+
+        if (status.enter) {  // ENTER key selects menu item
             if (menu_index == 0) {
                 String ssid = get_text_input("Enter WiFi SSID:", 63);
                 if (ssid.length() > 0) {
@@ -545,22 +580,28 @@ void read_keyboard_input() {
     if (M5Cardputer.Keyboard.isChange()) {
         auto status = M5Cardputer.Keyboard.keysState();
 
-        // KEY2 opens config menu (check for specific keys)
-        if (status.word == 'h' || status.word == 2) {
-            current_state = STATE_CONFIG_MENU;
-            delay(300);
-            return;
+        // KEY2 opens config menu
+        if (!status.word.empty()) {
+            char key = status.word[0];
+
+            if (key == 'h') {  // KEY2 config menu
+                current_state = STATE_CONFIG_MENU;
+                delay(300);
+                return;
+            }
+
+            // Handle navigation and action keys
+            switch(key) {
+                case 'w': case 'W': case 'i': send_button_press("UP"); break;
+                case 's': case 'S': case 'k': send_button_press("DOWN"); break;
+                case 'a': case 'A': case 'j': send_button_press("LEFT"); break;
+                case 'd': case 'D': case 'l': send_button_press("RIGHT"); break;
+                case ' ': send_button_press("OK"); break;
+                case '\x1b': send_button_press("KEY1"); break;
+                case 'q': case 'Q': send_button_press("KEY3"); break;
+            }
         }
 
-        switch(status.word) {
-            case 'w': case 'W': case 'i': send_button_press("UP"); break;
-            case 's': case 'S': case 'k': send_button_press("DOWN"); break;
-            case 'a': case 'A': case 'j': send_button_press("LEFT"); break;
-            case 'd': case 'D': case 'l': send_button_press("RIGHT"); break;
-            case ' ': send_button_press("OK"); break;
-            case '\x1b': send_button_press("KEY1"); break;
-            case 'q': case 'Q': send_button_press("KEY3"); break;
-        }
         if (status.enter) {
             send_button_press("OK");
         }
