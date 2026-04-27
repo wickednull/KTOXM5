@@ -792,7 +792,8 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             break;
 
         case WStype_CONNECTED:
-            Serial.println("[WSc] Connected!");
+            Serial.println("[WSc] ✓ CONNECTED!");
+            Serial.println("[WSc] Waiting for frames...");
             ws_connected = true;
             M5Cardputer.Display.fillScreen(TFT_BLACK);
             M5Cardputer.Display.setTextColor(KTOX_GREEN);
@@ -803,39 +804,47 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             M5Cardputer.Display.setTextSize(1);
             M5Cardputer.Display.setCursor(0, 90);
             M5Cardputer.Display.println("Connected!");
+            M5Cardputer.Display.println("Requesting stream...");
             delay(1000);
             break;
 
         case WStype_TEXT: {
+            Serial.printf("[WSc] Message received: %d bytes\n", length);
+
             DynamicJsonDocument doc(50000);
             DeserializationError error = deserializeJson(doc, payload);
 
             if (error) {
-                Serial.print("JSON error: ");
-                Serial.println(error.c_str());
+                Serial.printf("[WSc] JSON ERROR: %s\n", error.c_str());
                 frame_stats.errors++;
                 return;
             }
 
             const char* msg_type = doc["type"];
-            Serial.printf("[WS] Received message type: %s\n", msg_type ? msg_type : "null");
+            Serial.printf("[WSc] Message type: %s\n", msg_type ? msg_type : "null");
 
-            if (msg_type == nullptr) return;
+            if (msg_type == nullptr) {
+                Serial.println("[WSc] No type field!");
+                return;
+            }
 
             if (strcmp(msg_type, "frame") == 0) {
                 const char* data = doc["data"];
                 if (data) {
-                    Serial.printf("[WS] Received frame data, size: %d bytes\n", strlen(data));
+                    int data_len = strlen(data);
+                    Serial.printf("[WSc] FRAME: %d bytes\n", data_len);
                     handle_frame_data(data);
                     frame_stats.received++;
+                    Serial.printf("[WSc] Frame decoded! (total: %d)\n", frame_stats.decoded);
                 } else {
-                    Serial.println("[WS] Frame message but no data!");
+                    Serial.println("[WSc] Frame message but NO DATA!");
                 }
             } else if (strcmp(msg_type, "result") == 0) {
                 last_result = doc["data"] | "Operation executed";
+                Serial.printf("[WSc] Result: %s\n", last_result.c_str());
                 current_state = STATE_EXECUTION;
             } else {
-                Serial.printf("[WS] Unknown message type: %s\n", msg_type);
+                Serial.printf("[WSc] UNKNOWN type: %s\n", msg_type);
             }
             break;
         }
