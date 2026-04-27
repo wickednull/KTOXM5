@@ -1,4 +1,4 @@
 // PlatformIO entrypoint.
-// Keep the original Arduino sketch at repo root for compatibility,
-// but include it from src/ so PlatformIO always has buildable sources.
+// Keep the original sketch in repository root for readability,
+// and include it from src/ so PlatformIO always has a build target.
 #include "../M5KTOxRemote.ino"
