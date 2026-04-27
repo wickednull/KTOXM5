@@ -62,17 +62,19 @@ AppState current_state = STATE_SETUP;
 // Menu structure
 int menu_index = 0;
 int submenu_index = 0;
+int current_menu = 0;  // 0=main, 1=recon, 2=offensive, 3=defensive, 4=wifi, 5=system
 String last_result = "";
 String execution_log = "";
+String target_ip = "";
 
 const char* main_menu[] = {
-    "[RECONNAISSANCE]",
-    "[OFFENSIVE ATTACKS]",
-    "[DEFENSIVE/MITM]",
-    "[WiFi ATTACKS]",
-    "[SYSTEM TOOLS]",
-    "[SETTINGS]",
-    "[BACK]"
+    "[>] Reconnaissance",
+    "[>] Offensive Attacks",
+    "[>] Defensive/MITM",
+    "[>] WiFi Attacks",
+    "[>] System Tools",
+    "[>] Settings",
+    "[<] Back to Stream"
 };
 const int main_menu_size = 7;
 
@@ -390,7 +392,7 @@ void show_main_menu() {
         draw_menu(main_menu, main_menu_size, menu_index);
         M5Cardputer.Display.setTextColor(KTOX_RUST);
         M5Cardputer.Display.setCursor(0, 115);
-        M5Cardputer.Display.println("UP/DOWN:Nav  ENTER:Select");
+        M5Cardputer.Display.println("UP/DOWN:Nav ENTER:Select");
         first_run = false;
     }
 
@@ -412,12 +414,22 @@ void show_main_menu() {
         }
 
         if (status.enter) {
+            submenu_index = 0;
+
             if (menu_index == 0) {
-                submenu_index = 0;
+                current_menu = 1;
                 current_state = STATE_SUBMENU;
-                // Would need proper submenu handling - for now show recon
             } else if (menu_index == 1) {
-                submenu_index = 0;
+                current_menu = 2;
+                current_state = STATE_SUBMENU;
+            } else if (menu_index == 2) {
+                current_menu = 3;
+                current_state = STATE_SUBMENU;
+            } else if (menu_index == 3) {
+                current_menu = 4;
+                current_state = STATE_SUBMENU;
+            } else if (menu_index == 4) {
+                current_menu = 5;
                 current_state = STATE_SUBMENU;
             } else if (menu_index == 5) {
                 current_state = STATE_CONFIG_MENU;
@@ -432,18 +444,125 @@ void show_main_menu() {
 }
 
 void show_submenu(const char** items, int size) {
-    // Submenu display logic
+    static bool first_run = true;
+    const char** current_items = NULL;
+    int current_size = 0;
+    const char* title = "";
+
+    // Select the correct menu based on current_menu
+    switch(current_menu) {
+        case 1:
+            current_items = recon_menu;
+            current_size = recon_menu_size;
+            title = "RECONNAISSANCE";
+            break;
+        case 2:
+            current_items = offensive_menu;
+            current_size = offensive_menu_size;
+            title = "OFFENSIVE ATTACKS";
+            break;
+        case 3:
+            current_items = defensive_menu;
+            current_size = defensive_menu_size;
+            title = "DEFENSIVE/MITM";
+            break;
+        case 4:
+            current_items = wifi_menu;
+            current_size = wifi_menu_size;
+            title = "WiFi ATTACKS";
+            break;
+        case 5:
+            current_items = system_menu;
+            current_size = system_menu_size;
+            title = "SYSTEM TOOLS";
+            break;
+    }
+
+    if (first_run) {
+        display_header(title);
+        M5Cardputer.Display.setTextColor(KTOX_WHITE);
+        M5Cardputer.Display.setCursor(0, 25);
+        draw_menu(current_items, current_size, submenu_index);
+        M5Cardputer.Display.setTextColor(KTOX_RUST);
+        M5Cardputer.Display.setCursor(0, 115);
+        M5Cardputer.Display.println("UP/DOWN:Nav ENTER:Run");
+        first_run = false;
+    }
+
+    M5Cardputer.update();
+
+    if (M5Cardputer.Keyboard.isChange()) {
+        auto status = M5Cardputer.Keyboard.keysState();
+
+        if (!status.word.empty()) {
+            char key = status.word[0];
+
+            if (key == 'w' || key == 'i') {
+                submenu_index = (submenu_index - 1 + current_size) % current_size;
+                first_run = true;
+            } else if (key == 's' || key == 'k') {
+                submenu_index = (submenu_index + 1) % current_size;
+                first_run = true;
+            }
+        }
+
+        if (status.enter) {
+            // Check if "Back" was selected
+            if (submenu_index == current_size - 1) {
+                menu_index = current_menu - 1;
+                current_state = STATE_MAIN_MENU;
+            } else {
+                // Execute the selected operation
+                String operation = String(current_items[submenu_index]);
+
+                // Show execution screen
+                M5Cardputer.Display.fillScreen(TFT_BLACK);
+                M5Cardputer.Display.setTextColor(KTOX_YELLOW);
+                M5Cardputer.Display.setTextSize(1);
+                M5Cardputer.Display.setCursor(0, 0);
+                M5Cardputer.Display.println("Executing:");
+                M5Cardputer.Display.setTextColor(KTOX_GREEN);
+                M5Cardputer.Display.println(operation);
+                M5Cardputer.Display.setTextColor(KTOX_WHITE);
+                M5Cardputer.Display.println("");
+                M5Cardputer.Display.println("Sending command...");
+
+                // Send command to KTOX_Pi
+                send_command(operation.c_str(), target_ip.c_str());
+
+                delay(2000);
+                current_state = STATE_RUNNING;
+            }
+            first_run = true;
+            delay(200);
+        }
+    }
 }
 
 void show_results() {
-    display_header("EXECUTION LOG");
-    M5Cardputer.Display.setTextColor(KTOX_WHITE);
-    M5Cardputer.Display.setCursor(0, 25);
-    M5Cardputer.Display.println(last_result.c_str());
+    static bool first_run = true;
 
-    M5Cardputer.Display.setTextColor(KTOX_RUST);
-    M5Cardputer.Display.setCursor(0, 115);
-    M5Cardputer.Display.println("ENTER:Back");
+    if (first_run) {
+        display_header("EXECUTION RESULT");
+        M5Cardputer.Display.setTextColor(KTOX_GREEN);
+        M5Cardputer.Display.setCursor(0, 25);
+        M5Cardputer.Display.setTextSize(1);
+        M5Cardputer.Display.println("[✓] Command Sent");
+
+        M5Cardputer.Display.setTextColor(KTOX_WHITE);
+        M5Cardputer.Display.setCursor(0, 45);
+        M5Cardputer.Display.println("Status: Processing");
+        M5Cardputer.Display.println("");
+        M5Cardputer.Display.println("Last Result:");
+        M5Cardputer.Display.setTextColor(KTOX_YELLOW);
+        M5Cardputer.Display.println(last_result.c_str());
+
+        M5Cardputer.Display.setTextColor(KTOX_RUST);
+        M5Cardputer.Display.setCursor(0, 115);
+        M5Cardputer.Display.println("ENTER:Back to Stream");
+
+        first_run = false;
+    }
 
     M5Cardputer.update();
 
@@ -451,6 +570,7 @@ void show_results() {
         auto status = M5Cardputer.Keyboard.keysState();
         if (status.enter) {
             current_state = STATE_RUNNING;
+            first_run = true;
             delay(200);
         }
     }
