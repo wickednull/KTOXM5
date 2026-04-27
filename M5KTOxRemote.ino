@@ -158,6 +158,7 @@ void show_submenu(const char** items, int size);
 void execute_operation(const char* operation);
 void show_results();
 void display_header(const char* title);
+void show_help_screen();
 String get_text_input(const char* prompt, int max_len, bool is_password = false);
 
 // ==================== SETUP ====================
@@ -876,7 +877,7 @@ void read_keyboard_input() {
         if (!status.word.empty()) {
             char key = status.word[0];
 
-            if (key == 'h') {  // KEY2 - config menu
+            if (key == 'h') {  // H - config menu
                 current_state = STATE_CONFIG_MENU;
                 delay(300);
                 return;
@@ -886,6 +887,16 @@ void read_keyboard_input() {
                 current_state = STATE_MAIN_MENU;
                 menu_index = 0;
                 delay(300);
+                return;
+            }
+
+            if (key == '?') {  // ? - show help
+                show_help_screen();
+                return;
+            }
+
+            if (key == 't') {  // T - set target IP
+                target_ip = get_text_input("Target IP:", 15);
                 return;
             }
 
@@ -903,6 +914,47 @@ void read_keyboard_input() {
         if (status.enter) {
             send_button_press("OK");
         }
+    }
+}
+
+void show_help_screen() {
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
+    M5Cardputer.Display.setTextColor(KTOX_RED);
+    M5Cardputer.Display.setTextSize(2);
+    M5Cardputer.Display.setCursor(0, 0);
+    M5Cardputer.Display.println("KTOx Help");
+
+    M5Cardputer.Display.setTextSize(1);
+    M5Cardputer.Display.setTextColor(KTOX_YELLOW);
+    M5Cardputer.Display.println("");
+    M5Cardputer.Display.setTextColor(KTOX_WHITE);
+
+    M5Cardputer.Display.println("[M] Open menu");
+    M5Cardputer.Display.println("[H] Config");
+    M5Cardputer.Display.println("[T] Set target IP");
+    M5Cardputer.Display.println("[?] Help");
+    M5Cardputer.Display.println("");
+    M5Cardputer.Display.println("Stream Controls:");
+    M5Cardputer.Display.println("WASD/IJKL Navigate");
+    M5Cardputer.Display.println("SPACE/ENTER Select");
+    M5Cardputer.Display.println("Q/ESC Actions");
+
+    M5Cardputer.Display.setTextColor(KTOX_RUST);
+    M5Cardputer.Display.setCursor(0, 115);
+    M5Cardputer.Display.println("ENTER:Back");
+
+    M5Cardputer.update();
+
+    while (true) {
+        if (M5Cardputer.Keyboard.isChange()) {
+            auto status = M5Cardputer.Keyboard.keysState();
+            if (status.enter) {
+                delay(200);
+                break;
+            }
+        }
+        M5Cardputer.update();
+        delay(10);
     }
 }
 
@@ -948,7 +1000,7 @@ void draw_status_bar() {
     last_update = millis();
 
     char status[256];
-    snprintf(status, sizeof(status), "[%s] F:%d FPS:%.1f",
+    snprintf(status, sizeof(status), "[%s] %d frames | FPS:%.1f",
              ws_connected ? "●" : "○",
              frame_count,
              frame_count * 1000.0f / (millis() + 1));
@@ -956,10 +1008,16 @@ void draw_status_bar() {
     uint16_t status_color = ws_connected ? KTOX_GREEN : KTOX_RED;
     M5Cardputer.Display.setTextColor(status_color, TFT_BLACK);
     M5Cardputer.Display.setTextSize(1);
-    M5Cardputer.Display.fillRect(0, 120, 240, 15, TFT_BLACK);
-    M5Cardputer.Display.drawRect(0, 120, 240, 15, status_color);
-    M5Cardputer.Display.setCursor(2, 124);
+    M5Cardputer.Display.fillRect(0, 118, 240, 17, TFT_BLACK);
+    M5Cardputer.Display.drawRect(0, 118, 240, 17, status_color);
+    M5Cardputer.Display.setCursor(2, 121);
     M5Cardputer.Display.print(status);
+
+    // Show keyboard hints
+    M5Cardputer.Display.setTextColor(KTOX_RUST);
+    M5Cardputer.Display.setTextSize(0);  // tiny font
+    M5Cardputer.Display.setCursor(2, 128);
+    M5Cardputer.Display.print("M:Menu H:Config");
 }
 
 // ==================== BASE64 DECODE ====================
