@@ -806,8 +806,18 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             Serial.println("[WSc] ✓ CONNECTED!");
             ws_connected = true;
 
-            // Send auth token if configured
-            if (strlen(settings.auth_token) > 0) {
+            // If no auth token, send stream_profile immediately
+            if (strlen(settings.auth_token) == 0) {
+                Serial.printf("[WSc] No auth token, sending stream_profile...\n");
+                DynamicJsonDocument profile_doc(512);
+                profile_doc["type"] = "stream_profile";
+                profile_doc["profile"] = "cardputer";
+                profile_doc["format"] = "json";
+                String profile_json;
+                serializeJson(profile_doc, profile_json);
+                webSocket.sendTXT(profile_json);
+            } else {
+                // Send auth token first
                 Serial.printf("[WSc] Sending auth token...\n");
                 DynamicJsonDocument auth_doc(512);
                 auth_doc["type"] = "auth";
@@ -871,9 +881,27 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
                 current_state = STATE_EXECUTION;
             } else if (strcmp(msg_type, "auth_ok") == 0) {
                 Serial.println("[WSc] ✓ Authentication successful!");
+                // Send stream_profile after auth succeeds
+                DynamicJsonDocument profile_doc(512);
+                profile_doc["type"] = "stream_profile";
+                profile_doc["profile"] = "cardputer";
+                profile_doc["format"] = "json";
+                String profile_json;
+                serializeJson(profile_doc, profile_json);
+                webSocket.sendTXT(profile_json);
             } else if (strcmp(msg_type, "auth_error") == 0) {
                 Serial.println("[WSc] ✗ Authentication failed!");
                 ws_connected = false;
+            } else if (strcmp(msg_type, "stream_profile") == 0) {
+                const char* status = doc["status"];
+                if (status && strcmp(status, "ok") == 0) {
+                    Serial.println("[WSc] ✓ Stream profile accepted!");
+                    const char* profile = doc["profile"];
+                    const char* format = doc["format"];
+                    Serial.printf("[WSc] Profile: %s, Format: %s\n", profile ? profile : "?", format ? format : "?");
+                } else {
+                    Serial.println("[WSc] ✗ Stream profile rejected!");
+                }
             } else {
                 Serial.printf("[WSc] UNKNOWN type: %s\n", msg_type);
             }
