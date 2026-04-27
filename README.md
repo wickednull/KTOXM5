@@ -43,8 +43,16 @@ Output file:
   pio run
   ```
 
+- `fatal: Remote branch 2.3.7 not found` while installing arduinoWebSockets  
+  You are on a broken intermediate commit. Pull latest (current config uses `links2004/WebSockets` from the PlatformIO registry):
+  ```bash
+  cd KTOXM5
+  git pull
+  pio run
+  ```
+
 - `Error: Nothing to build. Please put your source code files to the .../src folder`  
-  Pull latest first (this repo now includes `src/main.cpp` for PlatformIO):
+  Pull latest first (this repo now builds directly from `M5KTOxRemote.ino` via `platformio.ini`):
   ```bash
   cd KTOXM5
   git pull
