@@ -818,17 +818,24 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             }
 
             const char* msg_type = doc["type"];
+            Serial.printf("[WS] Received message type: %s\n", msg_type ? msg_type : "null");
+
             if (msg_type == nullptr) return;
 
             if (strcmp(msg_type, "frame") == 0) {
                 const char* data = doc["data"];
                 if (data) {
+                    Serial.printf("[WS] Received frame data, size: %d bytes\n", strlen(data));
                     handle_frame_data(data);
                     frame_stats.received++;
+                } else {
+                    Serial.println("[WS] Frame message but no data!");
                 }
             } else if (strcmp(msg_type, "result") == 0) {
                 last_result = doc["data"] | "Operation executed";
                 current_state = STATE_EXECUTION;
+            } else {
+                Serial.printf("[WS] Unknown message type: %s\n", msg_type);
             }
             break;
         }
@@ -851,27 +858,36 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 // ==================== FRAME HANDLING ====================
 void handle_frame_data(const char* base64_data) {
+    Serial.printf("[Frame] Base64 input size: %d bytes\n", strlen(base64_data));
+
     uint32_t jpeg_size = base64_decode_expected_len(strlen(base64_data));
+    Serial.printf("[Frame] Expected JPEG size: %d bytes\n", jpeg_size);
+
     uint8_t jpeg_buffer[jpeg_size];
 
     int decoded_size = base64_decode((unsigned char*)base64_data,
                                       strlen(base64_data),
                                       jpeg_buffer);
 
+    Serial.printf("[Frame] Decoded size: %d bytes\n", decoded_size);
+
     if (decoded_size <= 0) {
-        Serial.println("Base64 decode failed!");
+        Serial.println("[Frame] Base64 decode failed!");
         frame_stats.errors++;
         return;
     }
 
+    Serial.println("[Frame] Calling TJpgDec.drawJpg()...");
     TJpgDec.drawJpg(0, 0, jpeg_buffer, decoded_size);
+    Serial.println("[Frame] TJpgDec.drawJpg() complete");
+
     frame_stats.decoded++;
     frame_count++;
 
     static unsigned long last_stats = 0;
     if (millis() - last_stats > 5000) {
         last_stats = millis();
-        Serial.printf("Frames: recv=%d, decoded=%d, errors=%d\n",
+        Serial.printf("[Stats] Frames: recv=%d, decoded=%d, errors=%d\n",
                       frame_stats.received, frame_stats.decoded, frame_stats.errors);
     }
 }
