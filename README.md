@@ -52,7 +52,7 @@ Output file:
   ```
 
 - `Error: Nothing to build. Please put your source code files to the .../src folder`  
-  Pull latest first (this repo now builds directly from `M5KTOxRemote.ino` via `platformio.ini`):
+  Pull latest first (this repo now includes `src/main.cpp` for PlatformIO):
   ```bash
   cd KTOXM5
   git pull
